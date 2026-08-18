@@ -642,11 +642,106 @@ struct ChessSceneView: UIViewRepresentable {
             }
             
             return (stone, armor, glow, weapon)
+        // MARK: - Загрузка High-Poly 3D моделей воинов (Blender USDZ / OBJ)
+        
+        private var highPolyModelCache: [String: SCNNode] = [:]
+        
+        func loadHighPolyModel(pieceType: PieceType, color: PieceColor) -> SCNNode? {
+            let baseName = "\(pieceType.rawValue)_\(color.rawValue)"
+            if let cached = highPolyModelCache[baseName] {
+                return cached.clone()
+            }
+            
+            var modelScene: SCNScene?
+            
+            let searchPaths: [(String, String)] = [
+                ("Models/\(baseName)", "usdz"),
+                (baseName, "usdz"),
+                ("Models/\(baseName)", "obj"),
+                (baseName, "obj")
+            ]
+            
+            for (name, ext) in searchPaths {
+                if let url = Bundle.main.url(forResource: name, withExtension: ext) ??
+                             Bundle.main.url(forResource: baseName, withExtension: ext, subdirectory: "Models") {
+                    if let scene = try? SCNScene(url: url, options: [
+                        SCNSceneSource.LoadingOption.convertToYUp: true,
+                        SCNSceneSource.LoadingOption.checkConsistency: false
+                    ]) {
+                        modelScene = scene
+                        break
+                    }
+                }
+                if let scene = SCNScene(named: "\(name).\(ext)") ?? SCNScene(named: name) {
+                    modelScene = scene
+                    break
+                }
+            }
+            
+            guard let loadedScene = modelScene else {
+                return nil
+            }
+            
+            let container = SCNNode()
+            for child in loadedScene.rootNode.childNodes {
+                container.addChildNode(child.clone())
+            }
+            
+            // Нормализация масштаба и центрирование модели
+            normalizeModelNode(container, pieceType: pieceType)
+            
+            highPolyModelCache[baseName] = container
+            return container.clone()
+        }
+        
+        func normalizeModelNode(_ node: SCNNode, pieceType: PieceType) {
+            let (minB, maxB) = node.boundingBox
+            let h = maxB.y - minB.y
+            let targetH: Float
+            switch pieceType {
+            case .king, .queen: targetH = 1.15
+            case .bishop, .knight, .rook: targetH = 1.00
+            case .pawn: targetH = 0.82
+            }
+            
+            if h > 0.05 {
+                let s = targetH / h
+                node.scale = SCNVector3(s, s, s)
+                
+                let cx = (minB.x + maxB.x) / 2.0 * s
+                let cz = (minB.z + maxB.z) / 2.0 * s
+                let minY = minB.y * s
+                node.pivot = SCNMatrix4MakeTranslation(cx, minY, cz)
+            }
         }
         
         // MARK: - Построитель 3D воинов
         
         func createWarriorCharacterNode(piece: Piece) -> SCNNode {
+            // 1. Попытка загрузки High-Poly модели из Blender ассетов
+            if let highPolyNode = loadHighPolyModel(pieceType: piece.type, color: piece.color) {
+                let root = SCNNode()
+                root.name = "piece_\(piece.id.uuidString)"
+                highPolyNode.position = SCNVector3(0, 0, 0)
+                root.addChildNode(highPolyNode)
+                
+                // Для белого слона добавляем динамический свет от факела
+                if piece.type == .bishop && piece.color == .white {
+                    let torchLight = SCNLight()
+                    torchLight.type = .omni
+                    torchLight.color = UIColor(red: 1.0, green: 0.75, blue: 0.35, alpha: 1.0)
+                    torchLight.intensity = 500
+                    torchLight.attenuationEndDistance = 4.0
+                    torchLight.castsShadow = false
+                    let lightNode = SCNNode()
+                    lightNode.light = torchLight
+                    lightNode.position = SCNVector3(-0.26, 1.25, 0.06)
+                    root.addChildNode(lightNode)
+                }
+                return root
+            }
+            
+            // 2. Процедурный fallback
             let root = SCNNode()
             root.name = "piece_\(piece.id.uuidString)"
             
