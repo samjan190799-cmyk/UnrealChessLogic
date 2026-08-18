@@ -24,6 +24,10 @@
     <true/>
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
+    <key>UIRequiresFullScreen</key>
+    <true/>
+    <key>UILaunchScreen</key>
+    <dict/>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>UIRequiredDeviceCapabilities</key>

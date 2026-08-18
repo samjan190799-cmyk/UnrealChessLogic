@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-deploy:
     name: "Сборка iOS и Выгрузка в TestFlight"
-    runs-on: macos-14
+    runs-on: macos-15
 
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
