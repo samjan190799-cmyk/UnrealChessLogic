@@ -25,10 +25,11 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
-      - name: "💎 Настройка Ruby и Fastlane"
+      - name: "💎 Установка Ruby и Fastlane через Bundler"
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
+          bundler-cache: true
 
       - name: "🔐 Настройка ключей App Store Connect API"
         run: |
@@ -49,4 +50,4 @@ jobs:
 
       - name: "📦 Выгрузка в TestFlight через Fastlane"
         run: |
-          fastlane ios beta
+          bundle exec fastlane ios beta
