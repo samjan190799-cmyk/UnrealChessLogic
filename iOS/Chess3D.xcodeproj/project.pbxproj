@@ -8,12 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		1D0000012C60000100000001 /* Chess3DApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D0000022C60000100000001 /* Chess3DApp.swift */; };
+		1D0000202C60000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1D0000212C60000100000001 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1D0000022C60000100000001 /* Chess3DApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chess3DApp.swift; sourceTree = "<group>"; };
 		1D0000032C60000100000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1D0000042C60000100000001 /* Chess3D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chess3D.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1D0000212C60000100000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +42,7 @@
 			children = (
 				1D0000022C60000100000001 /* Chess3DApp.swift */,
 				1D0000032C60000100000001 /* Info.plist */,
+				1D0000212C60000100000001 /* Assets.xcassets */,
 			);
 			path = Chess3D;
 			sourceTree = "<group>";
@@ -109,6 +112,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1D0000202C60000100000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
