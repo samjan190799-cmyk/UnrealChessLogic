@@ -7,6 +7,7 @@ platform :ios do
     issuer_id = ENV["APP_STORE_CONNECT_ISSUER_ID"]
     key_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
     team_id = ENV["DEVELOPMENT_TEAM"]
+    bundle_id = "com.Antigravity.Chess3D"
 
     # 1. Авторизация через App Store Connect API Key
     api_key = app_store_connect_api_key(
@@ -40,6 +41,7 @@ platform :ios do
     # 3. Выгрузка собранного .ipa пакета в TestFlight
     upload_to_testflight(
       api_key: api_key,
+      app_identifier: bundle_id,
       ipa: "build/Chess3D.ipa",
       skip_waiting_for_build_processing: true,
       changelog: "Реализация 3D шахмат на UE5 с Chaos Physics и сенсорным управлением под iOS",
