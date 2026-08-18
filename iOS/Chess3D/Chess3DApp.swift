@@ -1485,7 +1485,7 @@ struct ChessSceneView: UIViewRepresentable {
                 let s = CGFloat.random(in: 0.05...0.20)
                 
                 if isPyramid {
-                    shardGeom = SCNPyramid(width: s, length: s * 0.8, height: s * 1.4)
+                    shardGeom = SCNPyramid(width: s, height: s * 1.4, length: s * 0.8)
                 } else {
                     shardGeom = SCNBox(width: s, height: s * 1.2, length: s * 0.7, chamferRadius: 0.015)
                 }
@@ -1605,7 +1605,7 @@ struct ChessSceneView: UIViewRepresentable {
                 let shardGeom: SCNGeometry
                 
                 if isPyramid {
-                    shardGeom = SCNPyramid(width: s, length: s * 0.9, height: s * 1.5)
+                    shardGeom = SCNPyramid(width: s, height: s * 1.5, length: s * 0.9)
                 } else {
                     shardGeom = SCNBox(width: s, height: s * 1.3, length: s * 0.8, chamferRadius: 0.02)
                 }
