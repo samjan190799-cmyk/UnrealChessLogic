@@ -3,10 +3,9 @@ default_platform(:ios)
 platform :ios do
   desc "Сборка iOS IPA и выгрузка в Apple TestFlight"
   lane :beta do
-    setup_ci if is_ci
-
     key_id = ENV["APP_STORE_CONNECT_KEY_ID"]
     issuer_id = ENV["APP_STORE_CONNECT_ISSUER_ID"]
+    key_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
     team_id = ENV["DEVELOPMENT_TEAM"]
     bundle_id = "com.Antigravity.Chess3D"
 
@@ -19,26 +18,27 @@ platform :ios do
       in_house: false
     )
 
-    # 2. Создание/получение свежего Distribution сертификата и профиля подписи в CI Keychain
-    get_certificates(api_key: api_key)
-    get_provisioning_profile(
-      api_key: api_key,
-      app_identifier: bundle_id
-    )
-
-    # 3. Сборка архива и генерация подписанного .ipa
+    # 2. Сборка архива и генерация .ipa через xcodebuild с прямой авторизацией в App Store Connect
     build_app(
       project: "iOS/Chess3D.xcodeproj",
       scheme: "Chess3D",
       configuration: "Release",
       export_method: "app-store",
       export_team_id: team_id,
+      export_options: {
+        teamID: team_id,
+        method: "app-store",
+        signingStyle: "automatic",
+        uploadSymbols: true,
+        uploadBitcode: false
+      },
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates -authenticationKeyID #{key_id} -authenticationKeyIssuerID #{issuer_id} -authenticationKeyPath #{key_path}",
       output_directory: "build",
       output_name: "Chess3D.ipa",
       clean: true
     )
 
-    # 4. Выгрузка собранного .ipa пакета в TestFlight
+    # 3. Выгрузка собранного .ipa пакета в TestFlight
     upload_to_testflight(
       api_key: api_key,
       app_identifier: bundle_id,
