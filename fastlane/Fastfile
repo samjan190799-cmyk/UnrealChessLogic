@@ -3,7 +3,7 @@ default_platform(:ios)
 platform :ios do
   desc "Сборка iOS IPA и выгрузка в Apple TestFlight"
   lane :beta do
-    # Настройка авторизации через App Store Connect API Key
+    # 1. Авторизация через App Store Connect API Key
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
@@ -12,20 +12,29 @@ platform :ios do
       in_house: false
     )
 
-    # 1. Автоматическая сборка iOS архива и генерация .ipa файла
+    team_id = ENV["DEVELOPMENT_TEAM"]
+
+    # 2. Сборка архива и генерация .ipa с авто-подписью Apple Developer Team
     build_app(
       project: "iOS/Chess3D.xcodeproj",
       scheme: "Chess3D",
       configuration: "Release",
       export_method: "app-store",
-      export_options: "ExportOptions.plist",
+      export_team_id: team_id,
+      export_options: {
+        teamID: team_id,
+        method: "app-store",
+        signingStyle: "automatic",
+        uploadSymbols: true,
+        uploadBitcode: false
+      },
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates",
       output_directory: "build",
       output_name: "Chess3D.ipa",
-      clean: true,
-      skip_profile_detection: true
+      clean: true
     )
 
-    # 2. Выгрузка собранного .ipa пакета в TestFlight
+    # 3. Выгрузка собранного .ipa пакета в TestFlight
     upload_to_testflight(
       api_key: api_key,
       ipa: "build/Chess3D.ipa",
