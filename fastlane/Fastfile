@@ -18,7 +18,7 @@ platform :ios do
       in_house: false
     )
 
-    # 2. Сборка архива и генерация .ipa через xcodebuild с прямой авторизацией в App Store Connect
+    # 2. Сборка архива без локальной подписи и экспорт с авто-подписью App Store Connect
     build_app(
       project: "iOS/Chess3D.xcodeproj",
       scheme: "Chess3D",
@@ -32,7 +32,7 @@ platform :ios do
         uploadSymbols: true,
         uploadBitcode: false
       },
-      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates -authenticationKeyID #{key_id} -authenticationKeyIssuerID #{issuer_id} -authenticationKeyPath #{key_path}",
+      xcargs: "CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -allowProvisioningUpdates -authenticationKeyID #{key_id} -authenticationKeyIssuerID #{issuer_id} -authenticationKeyPath #{key_path}",
       output_directory: "build",
       output_name: "Chess3D.ipa",
       clean: true
