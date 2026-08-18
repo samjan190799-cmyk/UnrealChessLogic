@@ -16,11 +16,10 @@ FileOpenOrder/*
 *.idea/
 *.vscode/
 
-# Xcode / Apple
-*.xcodeproj
-*.xcworkspace
+# Xcode / Apple User Data
 xcuserdata/
 DerivedData/
+iOS/Chess3D.xcodeproj/xcuserdata/
 
 # OS generated
 .DS_Store
