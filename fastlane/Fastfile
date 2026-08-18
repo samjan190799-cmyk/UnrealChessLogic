@@ -7,7 +7,7 @@ platform :ios do
     issuer_id = ENV["APP_STORE_CONNECT_ISSUER_ID"]
     key_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
     team_id = ENV["DEVELOPMENT_TEAM"]
-    bundle_id = "com.Antigravity.Chess3D"
+    bundle_id = "com.Chess3D"
 
     # 1. Авторизация через App Store Connect API Key
     api_key = app_store_connect_api_key(
