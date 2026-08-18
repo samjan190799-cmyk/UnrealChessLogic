@@ -1389,6 +1389,319 @@ struct ChessSceneView: UIViewRepresentable {
             root.addChildNode(cross2Node)
         }
         
+        // MARK: - Chaos Physics: Кинематографическое разрушение фигур
+        
+        func animateMove(piece: Piece, to targetCoord: ChessCoord, captured: Piece?) {
+            guard let node = pieceNodes[piece.id] else { return }
+            
+            if let captured = captured, let capNode = pieceNodes[captured.id] {
+                // Тактильная отдача на удар
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                
+                // Взрыв и разрушение захваченной фигуры
+                if captured.color == .white {
+                    spawnWhiteDestructionExplosion(at: capNode.position)
+                } else {
+                    spawnBlackDestructionExplosion(at: capNode.position)
+                }
+                
+                // Фигура распадается мгновенно под вспышкой взрыва
+                SCNTransaction.begin()
+                SCNTransaction.animationDuration = 0.12
+                capNode.opacity = 0.0
+                capNode.scale = SCNVector3(0.01, 0.01, 0.01)
+                SCNTransaction.commit()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    capNode.removeFromParentNode()
+                    self.pieceNodes.removeValue(forKey: captured.id)
+                }
+                triggerCinematicCameraShake()
+            }
+            
+            // Параболическое перемещение атакующей фигуры
+            let targetPos = SCNVector3(
+                x: Float(targetCoord.file),
+                y: 0.06,
+                z: Float(7 - targetCoord.rank)
+            )
+            let midY: Float = 1.3
+            let liftPos = SCNVector3(
+                x: (node.position.x + targetPos.x) / 2,
+                y: midY,
+                z: (node.position.z + targetPos.z) / 2
+            )
+            
+            let moveUp = SCNAction.move(to: liftPos, duration: 0.18)
+            moveUp.timingMode = .easeOut
+            let moveDown = SCNAction.move(to: targetPos, duration: 0.18)
+            moveDown.timingMode = .easeIn
+            
+            node.runAction(SCNAction.sequence([moveUp, moveDown]))
+        }
+        
+        // 💥 БЕЛЫЕ: Божественный раскол мрамора, золотая вспышка, ударная волна, 45+ осколков
+        func spawnWhiteDestructionExplosion(at pos: SCNVector3) {
+            guard let scene = scene else { return }
+            
+            // 1. Ослепительная световая вспышка
+            let flashLight = SCNLight()
+            flashLight.type = .omni
+            flashLight.color = UIColor(red: 1.0, green: 0.95, blue: 0.75, alpha: 1.0)
+            flashLight.intensity = 8000
+            flashLight.attenuationEndDistance = 8.0
+            let flashNode = SCNNode()
+            flashNode.light = flashLight
+            flashNode.position = SCNVector3(pos.x, pos.y + 0.5, pos.z)
+            scene.rootNode.addChildNode(flashNode)
+            
+            let fadeFlash = SCNAction.customAction(duration: 0.35) { node, elapsedTime in
+                let progress = Float(elapsedTime / 0.35)
+                node.light?.intensity = CGFloat(8000 * (1.0 - progress))
+            }
+            flashNode.runAction(SCNAction.sequence([fadeFlash, SCNAction.removeFromParentNode()]))
+            
+            // 2. Расширяющаяся золотая ударная волна
+            let shockwaveGeom = SCNTorus(ringRadius: 0.3, pipeRadius: 0.035)
+            let shockMat = SCNMaterial()
+            shockMat.diffuse.contents = UIColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 0.9)
+            shockMat.emission.contents = UIColor(red: 1.0, green: 0.75, blue: 0.20, alpha: 1.0)
+            shockwaveGeom.materials = [shockMat]
+            let shockNode = SCNNode(geometry: shockwaveGeom)
+            shockNode.position = SCNVector3(pos.x, 0.08, pos.z)
+            shockNode.scale = SCNVector3(0.5, 0.5, 0.5)
+            scene.rootNode.addChildNode(shockNode)
+            
+            let expandWave = SCNAction.scale(to: 5.5, duration: 0.35)
+            expandWave.timingMode = .easeOut
+            let fadeWave = SCNAction.fadeOut(duration: 0.35)
+            shockNode.runAction(SCNAction.sequence([SCNAction.group([expandWave, fadeWave]), SCNAction.removeFromParentNode()]))
+            
+            // 3. 45+ Осколков мрамора и золотой брони
+            for i in 0..<45 {
+                let isArmorShard = i % 3 == 0
+                let isPyramid = i % 2 == 0
+                let shardGeom: SCNGeometry
+                let s = CGFloat.random(in: 0.05...0.20)
+                
+                if isPyramid {
+                    shardGeom = SCNPyramid(width: s, length: s * 0.8, height: s * 1.4)
+                } else {
+                    shardGeom = SCNBox(width: s, height: s * 1.2, length: s * 0.7, chamferRadius: 0.015)
+                }
+                
+                let shardMat = SCNMaterial()
+                if isArmorShard {
+                    shardMat.diffuse.contents = UIColor(red: 0.85, green: 0.65, blue: 0.25, alpha: 1.0)
+                    shardMat.metalness.contents = 0.95
+                    shardMat.roughness.contents = 0.15
+                } else {
+                    let b = CGFloat.random(in: 0.78...0.90)
+                    shardMat.diffuse.contents = UIColor(red: b, green: b * 0.92, blue: b * 0.80, alpha: 1.0)
+                    shardMat.metalness.contents = 0.1
+                    shardMat.roughness.contents = 0.25
+                }
+                shardGeom.materials = [shardMat]
+                let shardNode = SCNNode(geometry: shardGeom)
+                shardNode.position = SCNVector3(pos.x, pos.y + Float.random(in: 0.1...0.6), pos.z)
+                scene.rootNode.addChildNode(shardNode)
+                
+                // Вектор разлета во все стороны
+                let angle = Float(i) * (Float.pi * 2.0 / 45.0) + Float.random(in: -0.2...0.2)
+                let speed = Float.random(in: 1.8...4.2)
+                let vx = cos(angle) * speed
+                let vz = sin(angle) * speed
+                let vy = Float.random(in: 2.2...5.5)
+                
+                let apexPos = SCNVector3(pos.x + vx * 0.45, pos.y + vy * 0.45, pos.z + vz * 0.45)
+                let groundPos = SCNVector3(pos.x + vx, 0.05, pos.z + vz)
+                let bouncePos = SCNVector3(groundPos.x + vx * 0.15, 0.20, groundPos.z + vz * 0.15)
+                let finalPos = SCNVector3(bouncePos.x + vx * 0.1, 0.05, bouncePos.z + vz * 0.1)
+                
+                let spin = SCNAction.rotateBy(
+                    x: CGFloat(Float.random(in: -15...15)),
+                    y: CGFloat(Float.random(in: -15...15)),
+                    z: CGFloat(Float.random(in: -15...15)),
+                    duration: 0.8
+                )
+                let launch = SCNAction.move(to: apexPos, duration: 0.20)
+                launch.timingMode = .easeOut
+                let drop = SCNAction.move(to: groundPos, duration: 0.22)
+                drop.timingMode = .easeIn
+                let bounceUp = SCNAction.move(to: bouncePos, duration: 0.10)
+                bounceUp.timingMode = .easeOut
+                let settle = SCNAction.move(to: finalPos, duration: 0.12)
+                settle.timingMode = .easeIn
+                let fade = SCNAction.fadeOut(duration: 0.5)
+                
+                let traj = SCNAction.sequence([launch, drop, bounceUp, settle, fade, SCNAction.removeFromParentNode()])
+                shardNode.runAction(SCNAction.group([spin, traj]))
+            }
+            
+            // 4. 35 Золотых искр
+            for _ in 0..<35 {
+                let sparkGeom = SCNSphere(radius: CGFloat.random(in: 0.015...0.04))
+                let sparkMat = SCNMaterial()
+                sparkMat.diffuse.contents = UIColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 1.0)
+                sparkMat.emission.contents = UIColor(red: 1.0, green: 0.75, blue: 0.20, alpha: 1.0)
+                sparkGeom.materials = [sparkMat]
+                let sparkNode = SCNNode(geometry: sparkGeom)
+                sparkNode.position = pos
+                scene.rootNode.addChildNode(sparkNode)
+                
+                let target = SCNVector3(
+                    x: pos.x + Float.random(in: -3.0...3.0),
+                    y: pos.y + Float.random(in: 0.5...4.5),
+                    z: pos.z + Float.random(in: -3.0...3.0)
+                )
+                let sparkFly = SCNAction.move(to: target, duration: TimeInterval.random(in: 0.3...0.7))
+                sparkFly.timingMode = .easeOut
+                let sparkFade = SCNAction.fadeOut(duration: 0.25)
+                sparkNode.runAction(SCNAction.sequence([SCNAction.group([sparkFly, sparkFade]), SCNAction.removeFromParentNode()]))
+            }
+        }
+        
+        // 🔥 ЧЁРНЫЕ: Магматический взрыв, раскаленные глыбы обсидиана, алые искры и дым
+        func spawnBlackDestructionExplosion(at pos: SCNVector3) {
+            guard let scene = scene else { return }
+            
+            // 1. Алая огненная вспышка взрыва
+            let flashLight = SCNLight()
+            flashLight.type = .omni
+            flashLight.color = UIColor(red: 1.0, green: 0.25, blue: 0.05, alpha: 1.0)
+            flashLight.intensity = 9000
+            flashLight.attenuationEndDistance = 9.0
+            let flashNode = SCNNode()
+            flashNode.light = flashLight
+            flashNode.position = SCNVector3(pos.x, pos.y + 0.5, pos.z)
+            scene.rootNode.addChildNode(flashNode)
+            
+            let fadeFlash = SCNAction.customAction(duration: 0.40) { node, elapsedTime in
+                let progress = Float(elapsedTime / 0.40)
+                node.light?.intensity = CGFloat(9000 * (1.0 - progress))
+            }
+            flashNode.runAction(SCNAction.sequence([fadeFlash, SCNAction.removeFromParentNode()]))
+            
+            // 2. Огненная ударная волна
+            let shockwaveGeom = SCNTorus(ringRadius: 0.3, pipeRadius: 0.04)
+            let shockMat = SCNMaterial()
+            shockMat.diffuse.contents = UIColor(red: 1.0, green: 0.20, blue: 0.0, alpha: 0.95)
+            shockMat.emission.contents = UIColor(red: 1.0, green: 0.15, blue: 0.0, alpha: 1.0)
+            shockwaveGeom.materials = [shockMat]
+            let shockNode = SCNNode(geometry: shockwaveGeom)
+            shockNode.position = SCNVector3(pos.x, 0.08, pos.z)
+            shockNode.scale = SCNVector3(0.5, 0.5, 0.5)
+            scene.rootNode.addChildNode(shockNode)
+            
+            let expandWave = SCNAction.scale(to: 6.0, duration: 0.38)
+            expandWave.timingMode = .easeOut
+            let fadeWave = SCNAction.fadeOut(duration: 0.38)
+            shockNode.runAction(SCNAction.sequence([SCNAction.group([expandWave, fadeWave]), SCNAction.removeFromParentNode()]))
+            
+            // 3. 50+ Раскаленных обсидиановых глыб с лавовыми трещинами
+            for i in 0..<50 {
+                let isPyramid = i % 2 == 0
+                let s = CGFloat.random(in: 0.06...0.22)
+                let shardGeom: SCNGeometry
+                
+                if isPyramid {
+                    shardGeom = SCNPyramid(width: s, length: s * 0.9, height: s * 1.5)
+                } else {
+                    shardGeom = SCNBox(width: s, height: s * 1.3, length: s * 0.8, chamferRadius: 0.02)
+                }
+                
+                let shardMat = SCNMaterial()
+                shardMat.diffuse.contents = UIColor(red: 0.06, green: 0.04, blue: 0.04, alpha: 1.0)
+                let em = CGFloat.random(in: 0.5...1.0)
+                shardMat.emission.contents = UIColor(red: em, green: em * 0.15, blue: 0.0, alpha: 1.0)
+                shardMat.metalness.contents = 0.4
+                shardMat.roughness.contents = 0.3
+                shardGeom.materials = [shardMat]
+                
+                let shardNode = SCNNode(geometry: shardGeom)
+                shardNode.position = SCNVector3(pos.x, pos.y + Float.random(in: 0.1...0.6), pos.z)
+                scene.rootNode.addChildNode(shardNode)
+                
+                let angle = Float(i) * (Float.pi * 2.0 / 50.0) + Float.random(in: -0.2...0.2)
+                let speed = Float.random(in: 2.0...4.8)
+                let vx = cos(angle) * speed
+                let vz = sin(angle) * speed
+                let vy = Float.random(in: 2.5...6.0)
+                
+                let apexPos = SCNVector3(pos.x + vx * 0.45, pos.y + vy * 0.45, pos.z + vz * 0.45)
+                let groundPos = SCNVector3(pos.x + vx, 0.05, pos.z + vz)
+                let bouncePos = SCNVector3(groundPos.x + vx * 0.15, 0.22, groundPos.z + vz * 0.15)
+                let finalPos = SCNVector3(bouncePos.x + vx * 0.1, 0.05, bouncePos.z + vz * 0.1)
+                
+                let spin = SCNAction.rotateBy(
+                    x: CGFloat(Float.random(in: -18...18)),
+                    y: CGFloat(Float.random(in: -18...18)),
+                    z: CGFloat(Float.random(in: -18...18)),
+                    duration: 0.85
+                )
+                let launch = SCNAction.move(to: apexPos, duration: 0.20)
+                launch.timingMode = .easeOut
+                let drop = SCNAction.move(to: groundPos, duration: 0.22)
+                drop.timingMode = .easeIn
+                let bounceUp = SCNAction.move(to: bouncePos, duration: 0.10)
+                bounceUp.timingMode = .easeOut
+                let settle = SCNAction.move(to: finalPos, duration: 0.12)
+                settle.timingMode = .easeIn
+                let fade = SCNAction.fadeOut(duration: 0.55)
+                
+                let traj = SCNAction.sequence([launch, drop, bounceUp, settle, fade, SCNAction.removeFromParentNode()])
+                shardNode.runAction(SCNAction.group([spin, traj]))
+            }
+            
+            // 4. 40 Огненных капель лавы
+            for _ in 0..<40 {
+                let emb = SCNSphere(radius: CGFloat.random(in: 0.02...0.05))
+                let embMat = SCNMaterial()
+                embMat.diffuse.contents = UIColor(red: 1.0, green: 0.30, blue: 0.0, alpha: 1.0)
+                embMat.emission.contents = UIColor(red: 1.0, green: 0.20, blue: 0.0, alpha: 1.0)
+                emb.materials = [embMat]
+                let embNode = SCNNode(geometry: emb)
+                embNode.position = pos
+                scene.rootNode.addChildNode(embNode)
+                
+                let target = SCNVector3(
+                    x: pos.x + Float.random(in: -3.2...3.2),
+                    y: pos.y + Float.random(in: 0.8...4.8),
+                    z: pos.z + Float.random(in: -3.2...3.2)
+                )
+                let embFly = SCNAction.move(to: target, duration: TimeInterval.random(in: 0.3...0.75))
+                embFly.timingMode = .easeOut
+                let embFade = SCNAction.fadeOut(duration: 0.3)
+                embNode.runAction(SCNAction.sequence([SCNAction.group([embFly, embFade]), SCNAction.removeFromParentNode()]))
+            }
+        }
+        
+        // 🎬 Кинематографический мульти-осевой шейк камеры (Trauma-based Camera Shake)
+        func triggerCinematicCameraShake() {
+            let originalPos = cameraNode.position
+            var actions: [SCNAction] = []
+            let steps = 6
+            
+            for i in 0..<steps {
+                let decay = Float(steps - i) / Float(steps)
+                let intensity = 0.45 * decay
+                let dx = Float.random(in: -intensity...intensity)
+                let dy = Float.random(in: -intensity...intensity)
+                let dz = Float.random(in: -intensity...intensity)
+                
+                let shakePos = SCNVector3(originalPos.x + dx, originalPos.y + dy, originalPos.z + dz)
+                let shakeMove = SCNAction.move(to: shakePos, duration: 0.04)
+                shakeMove.timingMode = .easeInEaseOut
+                actions.append(shakeMove)
+            }
+            
+            let resetMove = SCNAction.move(to: originalPos, duration: 0.10)
+            resetMove.timingMode = .easeOut
+            actions.append(resetMove)
+            
+            cameraNode.runAction(SCNAction.sequence(actions))
+        }
+        
         // MARK: - Подсветка допустимых ходов
         
         func syncBoardHighlights(legalMoves: [ChessCoord], selectedPiece: Piece?) {
@@ -1449,200 +1762,7 @@ struct ChessSceneView: UIViewRepresentable {
                 highlightNodes.append(markerNode)
             }
         }
-        
-        // MARK: - Chaos Physics: Эффекты разрушения
-        
-        func animateMove(piece: Piece, to targetCoord: ChessCoord, captured: Piece?) {
-            guard let node = pieceNodes[piece.id] else { return }
-            
-            if let captured = captured, let capNode = pieceNodes[captured.id] {
-                if captured.color == .white {
-                    spawnWhiteDestructionExplosion(at: capNode.position)
-                } else {
-                    spawnBlackDestructionExplosion(at: capNode.position)
-                }
-                
-                SCNTransaction.begin()
-                SCNTransaction.animationDuration = 0.22
-                capNode.opacity = 0.0
-                capNode.scale = SCNVector3(0.01, 0.01, 0.01)
-                SCNTransaction.commit()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    capNode.removeFromParentNode()
-                    self.pieceNodes.removeValue(forKey: captured.id)
-                }
-                punchCamera()
-            }
-            
-            // Параболическое перемещение фигуры с вращением
-            let targetPos = SCNVector3(
-                x: Float(targetCoord.file),
-                y: 0.06,
-                z: Float(7 - targetCoord.rank)
-            )
-            let midY: Float = 1.5
-            let liftPos = SCNVector3(
-                x: (node.position.x + targetPos.x) / 2,
-                y: midY,
-                z: (node.position.z + targetPos.z) / 2
-            )
-            
-            let moveUp = SCNAction.move(to: liftPos, duration: 0.20)
-            moveUp.timingMode = .easeOut
-            let moveDown = SCNAction.move(to: targetPos, duration: 0.20)
-            moveDown.timingMode = .easeIn
-            
-            node.runAction(SCNAction.sequence([moveUp, moveDown]))
-        }
-        
-        // 💥 Белые: Золотисто-костяные осколки, золотая пыль
-        func spawnWhiteDestructionExplosion(at pos: SCNVector3) {
-            guard let scene = scene else { return }
-            
-            // Крупные костяные осколки
-            for _ in 0..<14 {
-                let sizes: [CGFloat] = [0.06, 0.08, 0.10, 0.12]
-                let s = sizes.randomElement()!
-                let shardGeom = SCNBox(width: s, height: s * 1.3, length: s * 0.6, chamferRadius: 0.01)
-                let shardMat = SCNMaterial()
-                let brightness = CGFloat.random(in: 0.72...0.92)
-                shardMat.diffuse.contents = UIColor(red: brightness, green: brightness * 0.88, blue: brightness * 0.68, alpha: 1.0)
-                shardMat.metalness.contents = 0.5
-                shardMat.roughness.contents = 0.3
-                shardGeom.materials = [shardMat]
-                let shardNode = SCNNode(geometry: shardGeom)
-                shardNode.position = pos
-                shardNode.eulerAngles = SCNVector3(
-                    x: Float.random(in: 0...Float.pi),
-                    y: Float.random(in: 0...Float.pi),
-                    z: Float.random(in: 0...Float.pi)
-                )
-                scene.rootNode.addChildNode(shardNode)
-                
-                let rx = Float.random(in: -1.5...1.5)
-                let ry = Float.random(in: 1.2...2.8)
-                let rz = Float.random(in: -1.5...1.5)
-                let launchPos = SCNVector3(x: pos.x + rx, y: pos.y + ry, z: pos.z + rz)
-                let groundPos = SCNVector3(x: launchPos.x, y: 0.05, z: launchPos.z)
-                
-                let spin = SCNAction.rotateBy(
-                    x: CGFloat(Float.random(in: -6...6)),
-                    y: CGFloat(Float.random(in: -6...6)),
-                    z: CGFloat(Float.random(in: -6...6)),
-                    duration: 0.6
-                )
-                let fly = SCNAction.move(to: launchPos, duration: 0.20)
-                fly.timingMode = .easeOut
-                let fall = SCNAction.move(to: groundPos, duration: 0.35)
-                fall.timingMode = .easeIn
-                let fade = SCNAction.fadeOut(duration: 0.55)
-                let remove = SCNAction.removeFromParentNode()
-                
-                shardNode.runAction(SCNAction.group([spin, SCNAction.sequence([fly, fall, fade, remove])]))
-            }
-            
-            // Мелкие золотые искры
-            for _ in 0..<10 {
-                let sparkGeom = SCNSphere(radius: CGFloat.random(in: 0.015...0.035))
-                let sparkMat = SCNMaterial()
-                sparkMat.diffuse.contents = UIColor(red: 1.0, green: 0.80, blue: 0.30, alpha: 1.0)
-                sparkMat.emission.contents = UIColor(red: 1.0, green: 0.65, blue: 0.10, alpha: 0.8)
-                sparkGeom.materials = [sparkMat]
-                let sparkNode = SCNNode(geometry: sparkGeom)
-                sparkNode.position = pos
-                scene.rootNode.addChildNode(sparkNode)
-                
-                let target = SCNVector3(
-                    x: pos.x + Float.random(in: -2.0...2.0),
-                    y: pos.y + Float.random(in: 0.5...3.0),
-                    z: pos.z + Float.random(in: -2.0...2.0)
-                )
-                let sparkFly = SCNAction.move(to: target, duration: TimeInterval.random(in: 0.3...0.7))
-                let sparkFade = SCNAction.fadeOut(duration: 0.3)
-                let sparkRemove = SCNAction.removeFromParentNode()
-                sparkNode.runAction(SCNAction.sequence([sparkFly, sparkFade, sparkRemove]))
-            }
-        }
-        
-        // 🔥 Чёрные: Раскалённый обсидиан, лава, дым
-        func spawnBlackDestructionExplosion(at pos: SCNVector3) {
-            guard let scene = scene else { return }
-            
-            // Раскалённые обсидиановые глыбы
-            for _ in 0..<16 {
-                let sizes: [CGFloat] = [0.07, 0.09, 0.11, 0.13]
-                let s = sizes.randomElement()!
-                let shardGeom = SCNBox(width: s, height: s * 1.2, length: s * 0.7, chamferRadius: 0.01)
-                let shardMat = SCNMaterial()
-                shardMat.diffuse.contents = UIColor(red: 0.06, green: 0.04, blue: 0.04, alpha: 1.0)
-                let emissionBrightness = CGFloat.random(in: 0.4...1.0)
-                shardMat.emission.contents = UIColor(red: emissionBrightness, green: emissionBrightness * 0.2, blue: 0.0, alpha: 0.9)
-                shardMat.metalness.contents = 0.3
-                shardGeom.materials = [shardMat]
-                let shardNode = SCNNode(geometry: shardGeom)
-                shardNode.position = pos
-                shardNode.eulerAngles = SCNVector3(
-                    x: Float.random(in: 0...Float.pi),
-                    y: Float.random(in: 0...Float.pi),
-                    z: Float.random(in: 0...Float.pi)
-                )
-                scene.rootNode.addChildNode(shardNode)
-                
-                let rx = Float.random(in: -1.6...1.6)
-                let ry = Float.random(in: 1.0...2.6)
-                let rz = Float.random(in: -1.6...1.6)
-                let launchPos = SCNVector3(x: pos.x + rx, y: pos.y + ry, z: pos.z + rz)
-                let groundPos = SCNVector3(x: launchPos.x, y: 0.05, z: launchPos.z)
-                
-                let spin = SCNAction.rotateBy(
-                    x: CGFloat(Float.random(in: -5...5)),
-                    y: CGFloat(Float.random(in: -5...5)),
-                    z: CGFloat(Float.random(in: -5...5)),
-                    duration: 0.7
-                )
-                let fly = SCNAction.move(to: launchPos, duration: 0.22)
-                fly.timingMode = .easeOut
-                let fall = SCNAction.move(to: groundPos, duration: 0.38)
-                fall.timingMode = .easeIn
-                let fade = SCNAction.fadeOut(duration: 0.5)
-                let remove = SCNAction.removeFromParentNode()
-                
-                shardNode.runAction(SCNAction.group([spin, SCNAction.sequence([fly, fall, fade, remove])]))
-            }
-            
-            // Огненные частицы лавы
-            for _ in 0..<12 {
-                let emb = SCNSphere(radius: CGFloat.random(in: 0.02...0.045))
-                let embMat = SCNMaterial()
-                embMat.diffuse.contents = UIColor(red: 1.0, green: 0.35, blue: 0.0, alpha: 1.0)
-                embMat.emission.contents = UIColor(red: 1.0, green: 0.2, blue: 0.0, alpha: 1.0)
-                emb.materials = [embMat]
-                let embNode = SCNNode(geometry: emb)
-                embNode.position = pos
-                scene.rootNode.addChildNode(embNode)
-                
-                let target = SCNVector3(
-                    x: pos.x + Float.random(in: -1.8...1.8),
-                    y: pos.y + Float.random(in: 0.8...3.5),
-                    z: pos.z + Float.random(in: -1.8...1.8)
-                )
-                let embFly = SCNAction.move(to: target, duration: TimeInterval.random(in: 0.35...0.75))
-                let embFade = SCNAction.fadeOut(duration: 0.4)
-                let embRemove = SCNAction.removeFromParentNode()
-                embNode.runAction(SCNAction.sequence([embFly, embFade, embRemove]))
-            }
-        }
-        
-        func punchCamera() {
-            let originalPos = cameraNode.position
-            let punchPos = SCNVector3(originalPos.x, originalPos.y - 0.35, originalPos.z - 0.35)
-            let punch = SCNAction.move(to: punchPos, duration: 0.06)
-            punch.timingMode = .easeOut
-            let back = SCNAction.move(to: originalPos, duration: 0.22)
-            back.timingMode = .easeInEaseOut
-            cameraNode.runAction(SCNAction.sequence([punch, back]))
-        }
+
         
         func updateCamera(perspective: ChessSceneView.CameraPerspective) {
             SCNTransaction.begin()
