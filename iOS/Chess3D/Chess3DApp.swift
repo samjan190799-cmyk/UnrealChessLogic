@@ -642,6 +642,8 @@ struct ChessSceneView: UIViewRepresentable {
             }
             
             return (stone, armor, glow, weapon)
+        }
+        
         // MARK: - Загрузка High-Poly 3D моделей воинов (Blender USDZ / OBJ)
         
         private var highPolyModelCache: [String: SCNNode] = [:]
