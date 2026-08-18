@@ -18,7 +18,7 @@ platform :ios do
       in_house: false
     )
 
-    # 2. Сборка архива и генерация .ipa с автоматической облачной подписью через App Store Connect API
+    # 2. Сборка архива и генерация .ipa для Apple Distribution
     build_app(
       project: "iOS/Chess3D.xcodeproj",
       scheme: "Chess3D",
@@ -32,7 +32,7 @@ platform :ios do
         uploadSymbols: true,
         uploadBitcode: false
       },
-      xcargs: "DEVELOPMENT_TEAM=#{team_id} -allowProvisioningUpdates -authenticationKeyID #{key_id} -authenticationKeyIssuerID #{issuer_id} -authenticationKeyPath #{key_path}",
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_IDENTITY=\"Apple Distribution\" -allowProvisioningUpdates -authenticationKeyID #{key_id} -authenticationKeyIssuerID #{issuer_id} -authenticationKeyPath #{key_path}",
       output_directory: "build",
       output_name: "Chess3D.ipa",
       clean: true
