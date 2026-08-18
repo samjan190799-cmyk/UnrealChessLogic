@@ -1,9 +1,9 @@
 default_platform(:ios)
 
 platform :ios do
-  desc "Сборка и выгрузка билда в Apple TestFlight"
+  desc "Сборка iOS IPA и выгрузка в Apple TestFlight"
   lane :beta do
-    # Настройка ключа App Store Connect API
+    # Настройка авторизации через App Store Connect API Key
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
@@ -12,9 +12,23 @@ platform :ios do
       in_house: false
     )
 
-    # Автоматическая выгрузка собранного IPA в TestFlight
+    # 1. Автоматическая сборка iOS архива и генерация .ipa файла
+    build_app(
+      project: "iOS/Chess3D.xcodeproj",
+      scheme: "Chess3D",
+      configuration: "Release",
+      export_method: "app-store",
+      export_options: "ExportOptions.plist",
+      output_directory: "build",
+      output_name: "Chess3D.ipa",
+      clean: true,
+      skip_profile_detection: true
+    )
+
+    # 2. Выгрузка собранного .ipa пакета в TestFlight
     upload_to_testflight(
       api_key: api_key,
+      ipa: "build/Chess3D.ipa",
       skip_waiting_for_build_processing: true,
       changelog: "Реализация 3D шахмат на UE5 с Chaos Physics и сенсорным управлением под iOS",
       distribute_external: false
