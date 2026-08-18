@@ -1,0 +1,56 @@
+name: "🚀 Сборка и Выгрузка в TestFlight"
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: "Сборка iOS и Выгрузка в TestFlight"
+    runs-on: macos-14
+
+    steps:
+      - name: "📥 Клонирование репозитория"
+        uses: actions/checkout@v4
+
+      - name: "⚙️ Настройка Xcode"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
+      - name: "💎 Настройка Ruby и Fastlane"
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: "🔐 Настройка ключей App Store Connect API"
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_PRIVATE_KEY" ]; then
+            echo "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+            echo "✅ Ключ авторизации App Store Connect установлен."
+          else
+            echo "⚠️ Секреты App Store Connect API не настроены в репозитории."
+          fi
+
+      - name: "🛠️ Валидация файлов проекта и структуры"
+        run: |
+          echo "Проверка конфигураций iOS и структуры плагина..."
+          ls -la
+          ls -la Config/
+
+      - name: "📦 Выгрузка в TestFlight через Fastlane"
+        if: ${{ env.ASC_KEY_ID != '' }}
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+        run: |
+          bundle exec fastlane ios beta || fastlane ios beta
