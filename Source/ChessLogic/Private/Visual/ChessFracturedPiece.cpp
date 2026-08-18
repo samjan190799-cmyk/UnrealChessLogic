@@ -1,7 +1,7 @@
 // Copyright (c) 2026. Все права защищены.
+
 #include "Visual/ChessFracturedPiece.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
-#include "Components/SceneComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 
@@ -14,13 +14,9 @@ AChessFracturedPiece::AChessFracturedPiece()
 
 	GeometryCollectionComponent = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("GeometryCollectionComponent"));
 	GeometryCollectionComponent->SetupAttachment(RootComponent);
-	GeometryCollectionComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	GeometryCollectionComponent->SetCollisionObjectType(ECC_Destructible);
-	GeometryCollectionComponent->SetCollisionResponseToAllChannels(ECR_Block);
-	GeometryCollectionComponent->SetGenerateOverlapEvents(false);
 	GeometryCollectionComponent->SetSimulatePhysics(true);
-	GeometryCollectionComponent->SetNotifyBreaks(true);
-	GeometryCollectionComponent->CastShadow = true;
+	GeometryCollectionComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GeometryCollectionComponent->SetNotifyRigidBodyCollision(true);
 }
 
 void AChessFracturedPiece::BeginPlay()
@@ -29,38 +25,42 @@ void AChessFracturedPiece::BeginPlay()
 	InitialScale = GetActorScale3D();
 }
 
-void AChessFracturedPiece::TriggerFracture(const FVector& HitDirection, float ImpulseMultiplier)
+void AChessFracturedPiece::TriggerFracture(const FVector& HitDirection, float ImpulseMultiplier, EChessPieceColor InPieceColor)
 {
-	if (!GeometryCollectionComponent)
+	PieceColor = InPieceColor;
+	if (GeometryCollectionComponent)
 	{
-		return;
+		GeometryCollectionComponent->SetSimulatePhysics(true);
+
+		const FVector NormalizedHit = HitDirection.GetSafeNormal();
+		const FVector ImpulseVector = (NormalizedHit * 0.75f + FVector::UpVector * 0.45f) * (BaseImpulseStrength * ImpulseMultiplier);
+
+		GeometryCollectionComponent->AddRadialImpulse(
+			GetActorLocation(),
+			150.0f,
+			BaseImpulseStrength * ImpulseMultiplier * 0.6f,
+			ERadialImpulseFalloff::RIF_Linear,
+			true
+		);
+
+		GeometryCollectionComponent->AddImpulse(ImpulseVector, NAME_None, true);
 	}
 
-	// Формируем вектор импульса с небольшим подбросом вверх для эффектного разлета
-	const FVector ImpactDir = (HitDirection.GetSafeNormal() + FVector(0.0f, 0.0f, 0.35f)).GetSafeNormal();
-	const float FinalImpulse = BaseImpulseStrength * FMath::Max(0.5f, ImpulseMultiplier);
-
-	GeometryCollectionComponent->SetSimulatePhysics(true);
-
-	// Прикладываем радиальный взрывной импульс и направленный толчок
-	GeometryCollectionComponent->AddRadialImpulse(
-		GetActorLocation(),
-		150.0f,
-		FinalImpulse,
-		ERadialImpulseFalloff::RIF_Linear,
-		true
-	);
-
-	GeometryCollectionComponent->AddImpulse(ImpactDir * (FinalImpulse * 0.5f));
-
-	// Спавн частиц каменной пыли и осколков Niagara
-	if (ImpactDustVFX && GetWorld())
+	// Выбор Niagara VFX по визуальному эталону:
+	// 1. Белые: Древние кости, золотая пыль и искры
+	// 2. Черные: Раскаленный лавовый обсидиан, огонь и дым
+	UNiagaraSystem* TargetVFX = (PieceColor == EChessPieceColor::White) ? WhiteBoneGoldVFX : BlackMagmaObsidianVFX;
+	if (TargetVFX)
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			GetWorld(),
-			ImpactDustVFX,
-			GetActorLocation() + FVector(0.0f, 0.0f, 15.0f),
-			ImpactDir.Rotation()
+			TargetVFX,
+			GetActorLocation(),
+			GetActorRotation(),
+			FVector(1.2f),
+			true,
+			true,
+			ENCPoolMethod::AutoRelease
 		);
 	}
 }
@@ -71,28 +71,24 @@ void AChessFracturedPiece::Tick(float DeltaTime)
 
 	ElapsedLifeTime += DeltaTime;
 
-	// 1. Перевод физики в спящий режим для оптимизации производительности на iOS
-	if (ElapsedLifeTime >= SleepDelay && !bPhysicsAsleep)
+	// 1. Засыпание физики (Sleep) через 1.8с для экономии аккумулятора и CPU на iOS
+	if (!bPhysicsAsleep && ElapsedLifeTime >= SleepDelay)
 	{
 		bPhysicsAsleep = true;
 		if (GeometryCollectionComponent)
 		{
 			GeometryCollectionComponent->SetSimulatePhysics(false);
-			GeometryCollectionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 
-	// 2. Плавное исчезновение (Fade-out) и уменьшение масштаба осколков
-	if (ElapsedLifeTime >= SleepDelay)
+	// 2. Плавное затухание (Fade-out scale) перед уничтожением
+	if (ElapsedLifeTime >= (TotalLifeSpan - 0.7f))
 	{
-		const float FadeDuration = FMath::Max(0.1f, TotalLifeSpan - SleepDelay);
-		const float FadeAlpha = FMath::Clamp((ElapsedLifeTime - SleepDelay) / FadeDuration, 0.0f, 1.0f);
-		const float EaseAlpha = FMath::InterpEaseIn(0.0f, 1.0f, FadeAlpha, 2.0f);
-
-		SetActorScale3D(FMath::Lerp(InitialScale, FVector::ZeroVector, EaseAlpha));
+		const float RemainingRatio = FMath::Clamp((TotalLifeSpan - ElapsedLifeTime) / 0.7f, 0.0f, 1.0f);
+		SetActorScale3D(InitialScale * RemainingRatio);
 	}
 
-	// 3. Полная очистка актера со сцены
+	// 3. Полная сборка мусора (Garbage Collection)
 	if (ElapsedLifeTime >= TotalLifeSpan)
 	{
 		Destroy();
