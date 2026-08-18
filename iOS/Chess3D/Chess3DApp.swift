@@ -4,7 +4,7 @@ import UIKit
 
 // MARK: - Модели шахматной логики
 
-enum PieceColor: String {
+enum PieceColor: String, Sendable {
     case white, black
     
     var opposite: PieceColor {
@@ -12,7 +12,7 @@ enum PieceColor: String {
     }
 }
 
-enum PieceType: String {
+enum PieceType: String, Sendable {
     case pawn, knight, bishop, rook, queen, king
     
     var symbol: String {
@@ -27,7 +27,7 @@ enum PieceType: String {
     }
 }
 
-struct ChessCoord: Hashable, Equatable {
+struct ChessCoord: Hashable, Equatable, Sendable {
     let file: Int // 0..7 (A..H)
     let rank: Int // 0..7 (1..8)
     
@@ -41,7 +41,7 @@ struct ChessCoord: Hashable, Equatable {
     }
 }
 
-struct Piece: Identifiable, Equatable {
+struct Piece: Identifiable, Equatable, Sendable {
     let id: UUID
     let type: PieceType
     let color: PieceColor
@@ -268,11 +268,12 @@ class ChessGameEngine: ObservableObject {
 
 // MARK: - 3D SceneKit Шахматная сцена
 
+@MainActor
 struct ChessSceneView: UIViewRepresentable {
     @ObservedObject var engine: ChessGameEngine
     @Binding var cameraPerspective: CameraPerspective
     
-    enum CameraPerspective: String, CaseIterable {
+    enum CameraPerspective: String, CaseIterable, Sendable {
         case player = "Игрок"
         case topDown = "Сверху"
         case dynamic3D = "3D Кинематограф"
@@ -304,6 +305,7 @@ struct ChessSceneView: UIViewRepresentable {
         Coordinator(engine: engine)
     }
     
+    @MainActor
     class Coordinator: NSObject {
         var engine: ChessGameEngine
         weak var scnView: SCNView?
@@ -430,7 +432,7 @@ struct ChessSceneView: UIViewRepresentable {
             case .capsule:
                 geom = SCNCapsule(capRadius: radius * 0.7, height: height)
             case .pyramid:
-                geom = SCNPyramid(width: radius * 2, length: radius * 2, height: height)
+                geom = SCNPyramid(width: radius * 2, height: height, length: radius * 2)
             }
             
             let mat = SCNMaterial()
